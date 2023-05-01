@@ -1,4 +1,5 @@
 import ast
+import base64
 import importlib
 from collections import defaultdict
 from functools import reduce
@@ -43,14 +44,14 @@ def load_config_file_vars(cfgfile: str, onezeroasboolean: bool = False) -> None:
         cfgdictcopy,
         cfgdictcopyaslist,
     ) = copy_dict_and_convert_values(pars2, onezeroasboolean=onezeroasboolean)
+
     if "sys" not in dct:
         dct["sys"] = importlib.import_module("sys")
     for key, item in cfgdictcopyaslist:
-        dct["sys"].argv.extend([f"--{item[-1]}", repr(key)])
+        dct["sys"].argv.extend([f"--{item[-1]}",  (base64.b16encode(ascii(str(key )).encode('utf-8')[1:-1]).decode('utf-8'))])
     config.allsysargs = [
-        ini for ini, x in enumerate(dct["sys"].argv) if x.startswith("-")
+        ini for ini, x in enumerate(dct["sys"].argv) if x.startswith("--")
     ]
-
     parse_ar()
 
 
@@ -212,7 +213,13 @@ def show_and_exit() -> None:
 def parse_ar() -> None:
     ges = list(iter_split_by_index(iterable=sys.argv, indexes=config.allsysargs))
     checkset = ("-?", "?", "-h", "--h", "help", "-help", "--help")
-    for ini, g in enumerate(ges[1:]):
+
+    for ini, gg in enumerate(ges[1:]):
+        g = [gg[0], base64.b16decode(gg[1]).decode('utf-8')]
+        try:
+            g = [g[0], ast.literal_eval(g[1])]
+        except Exception:
+            pass
         try:
             there = g[0] in checkset
             if there:
