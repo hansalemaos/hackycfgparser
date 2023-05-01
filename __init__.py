@@ -14,13 +14,12 @@ import sys
 from ast import literal_eval
 from functools import wraps
 from itertools import tee
-
 nested_dict = lambda: defaultdict(nested_dict)
 config = sys.modules[__name__]
 config.parsedargs = {}
 config.helptext = ""
 config.stop_after_kill = True
-
+config.sysargvcopy = []
 
 def load_config_file_vars(cfgfile: str, onezeroasboolean: bool = False) -> None:
     """
@@ -36,7 +35,6 @@ def load_config_file_vars(cfgfile: str, onezeroasboolean: bool = False) -> None:
     """
     f = sys._getframe(1)
     dct = f.f_globals
-
     pars2 = ConfigParser()
     pars2.read(cfgfile)
 
@@ -47,8 +45,18 @@ def load_config_file_vars(cfgfile: str, onezeroasboolean: bool = False) -> None:
 
     if "sys" not in dct:
         dct["sys"] = importlib.import_module("sys")
+    config.sysargvcopy.extend(dct['sys'].argv)
     for key, item in cfgdictcopyaslist:
-        dct["sys"].argv.extend([f"--{item[-1]}",  (base64.b16encode(ascii(str(key )).encode('utf-8')[1:-1]).decode('utf-8'))])
+        dct["sys"].argv.extend(
+            [
+                f"--{item[-1]}",
+                (
+                    base64.b16encode(ascii(str(key)).encode("utf-8")[1:-1]).decode(
+                        "utf-8"
+                    )
+                ),
+            ]
+        )
     config.allsysargs = [
         ini for ini, x in enumerate(dct["sys"].argv) if x.startswith("--")
     ]
@@ -215,11 +223,14 @@ def parse_ar() -> None:
     checkset = ("-?", "?", "-h", "--h", "help", "-help", "--help")
 
     for ini, gg in enumerate(ges[1:]):
-        g = [gg[0], base64.b16decode(gg[1]).decode('utf-8')]
         try:
-            g = [g[0], ast.literal_eval(g[1])]
+            g = [gg[0], base64.b16decode(gg[1]).decode("utf-8")]
+            try:
+                g = [g[0], ast.literal_eval(g[1])]
+            except Exception:
+                pass
         except Exception:
-            pass
+            g = gg
         try:
             there = g[0] in checkset
             if there:
@@ -294,4 +305,6 @@ def add_config(f_py=None):
 
         return wrapper
 
+    dct['sys'].argv.clear()
+    dct['sys'].argv.extend(config.sysargvcopy)
     return _decorator(f_py) if callable(f_py) else _decorator
